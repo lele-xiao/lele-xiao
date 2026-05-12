@@ -1,0 +1,14 @@
+{
+  "name": "乐乐打卡机",
+  "short_name": "乐乐打卡",
+  "description": "儿童学习任务打卡乐园，科学分段，积分成长",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#FFD966",
+  "background_color": "#FFF0D6",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "https://cdn-icons-png.flaticon.com/512/1995/1995572.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "https://cdn-icons-png.flaticon.com/512/1995/1995572.png", "sizes": "192x192", "type": "image/png" }
+  ]
+}
