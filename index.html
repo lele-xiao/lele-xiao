@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="theme-color" content="#FFD966">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="乐乐打卡机">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1995/1995572.png">
+    <title>乐乐打卡机 · 儿童学习乐园</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(145deg, #d9efff 0%, #fff0d6 100%);
+            font-family: 'Comic Neue', 'Segoe UI', 'Poppins', 'PingFang SC', system-ui, sans-serif;
+        }
+        .btn-tap:active { transform: scale(0.96); transition: 0.05s; }
+        .cal-day {
+            width: 2.6rem; height: 2.6rem; display: flex; align-items: center; justify-content: center;
+            border-radius: 9999px; font-size: 0.9rem; font-weight: 500; background-color: #fff9ef;
+            cursor: pointer; transition: 0.1s;
+        }
+        .cal-day.selected { background-color: #3b82f6; color: white; box-shadow: 0 4px 8px rgba(59,130,246,0.3); }
+        .cal-day.checked { background-color: #fbbf24; color: #78350f; position: relative; }
+        .cal-day.checked::after { content: "✓"; font-size: 0.7rem; margin-left: 2px; }
+        .progress-bar-animate { transition: width 0.3s ease; }
+        .toast-encourage {
+            animation: bouncePop 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        @keyframes bouncePop {
+            0% { opacity: 0; transform: scale(0.8) translateY(10px);}
+            80% { opacity: 1; transform: scale(1.02) translateY(-2px);}
+            100% { opacity: 1; transform: scale(1) translateY(0);}
+        }
+        .timezone-card {
+            background: #fffef7; border-radius: 1.5rem; margin-bottom: 1rem;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.03);
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+        .cartoon-float { animation: float 3s ease-in-out infinite; }
+        .time-edit-input {
+            width: 65px; border: 1px solid #fde68a; border-radius: 20px;
+            padding: 2px 6px; font-size: 0.7rem; background: #fffbeb;
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #ffe6c7; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 flex justify-center items-start min-h-screen">
+<div id="app" class="w-full max-w-md mx-auto relative pb-8">
+
+    <!-- 卡通人物小贴图 -->
+    <div class="flex justify-between items-end -mb-2 relative z-10 px-1">
+        <div class="cartoon-float bg-white/80 rounded-full p-2 shadow-md flex items-center gap-1 text-xs">
+            <i class="fas fa-otter text-2xl text-amber-600"></i>
+            <span class="text-amber-700 font-bold">乐乐陪你学~</span>
+        </div>
+        <div class="cartoon-float bg-white/80 rounded-full p-2 shadow-md flex items-center gap-1 text-xs" style="animation-delay: 0.5s;">
+            <i class="fas fa-bear text-2xl text-sky-500"></i>
+            <span class="text-sky-600 font-bold">每天进步一点点</span>
+        </div>
+    </div>
+
+    <!-- ========= 1. 顶部用户成长模块 ========= -->
+    <div class="bg-gradient-to-br from-amber-50 to-sky-50 p-5 rounded-3xl shadow-md border border-white/80 mb-4 mt-1">
+        <div class="flex items-center gap-3">
+            <div class="bg-amber-200 w-12 h-12 rounded-full flex items-center justify-center shadow-md">
+                <i class="fas fa-crown text-amber-600 text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-amber-800">乐乐打卡机</h1>
+                <div class="flex gap-2 text-xs text-amber-700">
+                    <span id="levelName">🥉 小青铜</span>
+                    <span id="totalPointsText">0分</span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3 bg-amber-200/60 rounded-full h-3 overflow-hidden">
+            <div id="levelProgressBar" class="bg-amber-500 h-3 rounded-full progress-bar-animate" style="width: 0%"></div>
+        </div>
+        <div class="text-right text-xs text-amber-700 mt-1" id="nextLevelHint">再得100分升级小白银 ✨</div>
+
+        <div class="grid grid-cols-3 gap-3 mt-5">
+            <div class="bg-white/70 rounded-2xl p-2 text-center shadow-sm">
+                <i class="fas fa-check-circle text-blue-400 text-lg"></i>
+                <p class="text-xs text-gray-500 mt-1">本月完成任务</p>
+                <p class="text-xl font-bold text-gray-700" id="monthTaskCount">0</p>
+            </div>
+            <div class="bg-white/70 rounded-2xl p-2 text-center shadow-sm">
+                <i class="fas fa-calendar-alt text-green-400 text-lg"></i>
+                <p class="text-xs text-gray-500 mt-1">学习天数</p>
+                <p class="text-xl font-bold text-gray-700" id="studyDaysCount">0</p>
+            </div>
+            <div class="bg-white/70 rounded-2xl p-2 text-center shadow-sm">
+                <i class="fas fa-star text-yellow-400 text-lg"></i>
+                <p class="text-xs text-gray-500 mt-1">本月积分</p>
+                <p class="text-xl font-bold text-gray-700" id="monthPointsSum">0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========= 2. 月度打卡日历模块 ========= -->
+    <div class="bg-white/90 rounded-3xl p-4 shadow-md mb-4 border border-amber-100">
+        <div class="flex justify-between items-center mb-3">
+            <button id="prevMonthBtn" class="text-2xl text-amber-500 w-8 h-8 rounded-full hover:bg-amber-100 btn-tap"><i class="fas fa-chevron-left"></i></button>
+            <h2 class="text-xl font-bold text-slate-700" id="calendarMonthYear">2026年5月</h2>
+            <button id="nextMonthBtn" class="text-2xl text-amber-500 w-8 h-8 rounded-full hover:bg-amber-100 btn-tap"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="grid grid-cols-7 text-center mb-2 text-xs font-semibold text-amber-600">
+            <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+        </div>
+        <div id="calendarGrid" class="grid grid-cols-7 gap-1 justify-items-center"></div>
+    </div>
+
+    <!-- ========= 3. 今日任务管理模块 ========= -->
+    <div class="bg-white/90 rounded-3xl p-4 shadow-md mb-4 border border-amber-100">
+        <div class="flex justify-between items-center flex-wrap gap-2 mb-3">
+            <div><i class="fas fa-calendar-day text-amber-500"></i> <span class="font-bold text-gray-700">今日任务 · </span><span id="selectedDateDisplay" class="font-mono">2026-05-11</span></div>
+            <button id="reviewTodayBtn" class="bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs px-3 py-1 rounded-full btn-tap"><i class="fas fa-smile-wink"></i> 今日复盘</button>
+        </div>
+
+        <!-- 每日小目标卡片 -->
+        <div id="dailyGoalCard" class="bg-amber-50 rounded-2xl p-3 mb-4 flex justify-between items-center">
+            <div>
+                <div class="font-bold text-amber-800 text-sm">🎯 每日小目标</div>
+                <div class="text-xs text-amber-700">完成所有【基础】类型任务 ➕ 额外+10积分</div>
+                <div class="text-xs text-gray-500" id="dailyGoalProgress">进度: 0/0</div>
+            </div>
+            <div id="dailyGoalBadge" class="bg-amber-200 rounded-full px-3 py-1 text-xs font-bold">未完成</div>
+        </div>
+
+        <!-- 两个科学时段：热身基础、巩固拓展（时间可调） -->
+        <div id="timezoneTasksContainer" class="space-y-4"></div>
+
+        <!-- 快捷预设任务按钮 -->
+        <div class="mt-4 border-t border-amber-100 pt-3">
+            <p class="text-xs text-gray-500 mb-2"><i class="fas fa-bolt text-amber-400"></i> 快捷预设任务（选择添加到的时段）</p>
+            <!-- 时段选择器 -->
+            <div class="flex gap-3 mb-3">
+                <label class="flex items-center gap-1 text-sm"><input type="radio" name="presetZone" value="warmup" checked> <span>🌞 热身基础</span></label>
+                <label class="flex items-center gap-1 text-sm"><input type="radio" name="presetZone" value="review"> <span>🌙 巩固拓展</span></label>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button data-name="背课文" data-points="5" data-type="basic" class="quick-preset bg-amber-100 text-amber-800 text-xs rounded-full px-3 py-1.5 btn-tap">📖 背课文 +5</button>
+                <button data-name="写日记/看图写话" data-points="10" data-type="advanced" class="quick-preset bg-amber-100 text-amber-800 text-xs rounded-full px-3 py-1.5 btn-tap">✏️ 写日记/看图写话 +10</button>
+                <button data-name="词语听写" data-points="5" data-type="basic" class="quick-preset bg-amber-100 text-amber-800 text-xs rounded-full px-3 py-1.5 btn-tap">📝 词语听写 +5</button>
+                <button data-name="时文阅读" data-points="15" data-type="advanced" class="quick-preset bg-amber-100 text-amber-800 text-xs rounded-full px-3 py-1.5 btn-tap">📰 时文阅读 +15</button>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-2 items-center">
+                <input type="text" id="customTaskName" placeholder="自定义任务" class="border border-amber-200 rounded-full p-1 text-sm flex-1 min-w-[120px] bg-amber-50">
+                <input type="number" id="customTaskPoints" placeholder="积分" value="5" class="w-16 border rounded-full p-1 text-sm bg-amber-50">
+                <select id="customTaskType" class="border rounded-full text-xs bg-amber-50 px-2 py-1">
+                    <option value="basic">基础</option>
+                    <option value="advanced">拔高</option>
+                </select>
+                <select id="customTaskZoneSelect" class="border rounded-full text-xs bg-amber-50 px-2 py-1">
+                    <option value="warmup">热身基础</option>
+                    <option value="review">巩固拓展</option>
+                </select>
+                <button id="addCustomTaskBtn" class="bg-blue-400 text-white px-3 rounded-full text-sm btn-tap">添加</button>
+            </div>
+        </div>
+        <div id="globalEmptyHint" class="text-center py-3 text-gray-400 text-sm bg-amber-50/50 rounded-2xl mt-3 hidden">✨ 今天还没有任务，添加一个吧~ ✨</div>
+    </div>
+
+    <!-- 辅助功能区 -->
+    <div class="grid grid-cols-3 gap-2 mb-4">
+        <button id="openShopBtn" class="bg-gradient-to-r from-amber-300 to-yellow-400 p-2 rounded-2xl shadow text-sm font-bold text-white btn-tap flex flex-col items-center"><i class="fas fa-gift text-lg"></i><span>积分商城</span></button>
+        <button id="reminderBtn" class="bg-gradient-to-r from-sky-300 to-blue-400 p-2 rounded-2xl shadow text-sm font-bold text-white btn-tap flex flex-col items-center"><i class="fas fa-bell text-lg"></i><span>任务提醒</span></button>
+        <button id="statsBtn" class="bg-gradient-to-r from-emerald-300 to-teal-400 p-2 rounded-2xl shadow text-sm font-bold text-white btn-tap flex flex-col items-center"><i class="fas fa-chart-line text-lg"></i><span>学习统计</span></button>
+    </div>
+
+    <!-- 积分商城模态框 -->
+    <div id="shopModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden" style="backdrop-filter: blur(3px);">
+        <div class="bg-white rounded-3xl w-11/12 max-w-sm p-5 max-h-[80vh] overflow-auto">
+            <div class="flex justify-between items-center border-b pb-2"><h3 class="font-bold text-lg">🎁 积分商城</h3><button id="closeShopBtn" class="text-gray-400 text-xl">&times;</button></div>
+            <div class="my-3 text-sm">当前积分: <span id="shopPointsSpan" class="font-bold text-amber-600">0</span> 分</div>
+            <div id="rewardList" class="space-y-2"></div>
+            <div class="mt-4"><h4 class="font-semibold">📜 兑换记录</h4><div id="exchangeHistoryList" class="text-xs text-gray-500 max-h-28 overflow-y-auto"></div></div>
+            <div class="mt-3 flex gap-2 flex-wrap"><input type="text" id="newRewardName" placeholder="新奖励名称" class="border rounded-xl p-1 text-sm flex-1"><input type="number" id="newRewardCost" placeholder="积分" class="border rounded-xl p-1 text-sm w-20"><button id="addRewardBtn" class="bg-blue-400 text-white px-3 rounded-full text-sm">添加奖励</button></div>
+        </div>
+    </div>
+
+    <!-- 任务提醒模态框 -->
+    <div id="reminderModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-3xl w-11/12 max-w-sm p-5"><h3 class="font-bold">⏰ 每日任务提醒</h3><p class="text-xs text-gray-500 my-2">设置提醒时间，浏览器需允许通知</p><input type="time" id="reminderTimeInput" class="border p-2 rounded-xl w-full"><button id="saveReminderBtn" class="mt-3 bg-amber-400 w-full py-2 rounded-full text-white btn-tap">保存并授权通知</button><div id="reminderStatus" class="text-xs mt-2 text-gray-400"></div><button id="closeReminderBtn" class="mt-2 text-gray-500 text-sm w-full">取消</button></div>
+    </div>
+
+    <!-- 学习统计模态框 -->
+    <div id="statsModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-3xl w-11/12 max-w-sm p-5 max-h-[80vh] overflow-auto"><h3 class="font-bold">📊 学习数据统计</h3>
+            <div class="flex gap-2 my-3"><button id="weekStatTab" class="bg-blue-100 px-3 py-1 rounded-full text-sm">本周</button><button id="monthStatTab" class="bg-amber-100 px-3 py-1 rounded-full text-sm">本月</button></div>
+            <div><p class="text-xs">📈 任务完成率: <span id="completionRateSpan">0%</span></p><div class="w-full bg-gray-200 rounded-full h-2"><div id="completionBar" class="bg-green-400 h-2 rounded-full" style="width:0%"></div></div></div>
+            <div class="mt-2"><p class="text-xs">⏱️ 学习总时长: <span id="totalStudyMinutesSpan">0</span> 分钟</p></div>
+            <div class="mt-3"><p class="text-xs font-semibold">📊 近7天完成趋势</p><canvas id="trendChart" width="280" height="120" class="w-full h-auto mt-1"></canvas></div>
+            <button id="closeStatsBtn" class="mt-4 bg-gray-200 w-full py-2 rounded-full btn-tap">关闭</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========= 时间段配置（支持时间自定义） =========
+    let timeZones = [
+        { id: "warmup", title: "🌞 热身基础", defaultTime: "19:00 - 20:00", icon: "fa-sun", tasks: [] },
+        { id: "review", title: "🌙 巩固拓展", defaultTime: "20:10 - 21:10", icon: "fa-moon", tasks: [] }
+    ];
+    function loadTimeSettings() {
+        const saved = localStorage.getItem("leleTimeSettings");
+        if(saved) {
+            try {
+                const times = JSON.parse(saved);
+                if(times.warmup) timeZones[0].defaultTime = times.warmup;
+                if(times.review) timeZones[1].defaultTime = times.review;
+            } catch(e) {}
+        }
+    }
+    function saveTimeSettings() {
+        localStorage.setItem("leleTimeSettings", JSON.stringify({
+            warmup: timeZones[0].defaultTime,
+            review: timeZones[1].defaultTime
+        }));
+    }
+
+    // ---------- 全局数据结构 ----------
+    let tasksByDate = new Map();
+    let nextTaskId = 1;
+    let totalPoints = 0;
+    let shopRewards = [];
+    let exchangeHistory = [];
+    let reminderTime = null;
+    let currentViewDate = new Date();
+    let currentCalYear, currentCalMonth;
+    let dailyBonusClaimedForDate = new Map();
+
+    const LEVELS = [
+        { name: "🥉 小青铜", min: 0, next: 100 },
+        { name: "🥈 小白银", min: 100, next: 300 },
+        { name: "🥇 小黄金", min: 300, next: 600 },
+        { name: "💎 小钻石", min: 600, next: 900 },
+        { name: "👑 荣耀王者", min: 900, next: 999999 }
+    ];
+    function getLevelInfo(points) {
+        for(let i=0;i<LEVELS.length;i++) {
+            if(points < LEVELS[i].next) return { level: LEVELS[i].name, currentMin: LEVELS[i].min, nextRequired: LEVELS[i].next };
+        }
+        return { level: LEVELS[LEVELS.length-1].name, currentMin: LEVELS[LEVELS.length-1].min, nextRequired: 999999 };
+    }
+
+    function saveAll() {
+        localStorage.setItem("leleDataFinal", JSON.stringify({
+            tasksByDate: Array.from(tasksByDate.entries()),
+            nextTaskId, totalPoints, shopRewards, exchangeHistory, reminderTime,
+            dailyBonusClaimedForDate: Array.from(dailyBonusClaimedForDate.entries())
+        }));
+    }
+    function loadAll() {
+        loadTimeSettings();
+        const raw = localStorage.getItem("leleDataFinal");
+        if(raw) {
+            try {
+                const d = JSON.parse(raw);
+                tasksByDate = new Map(d.tasksByDate);
+                nextTaskId = d.nextTaskId;
+                totalPoints = d.totalPoints;
+                shopRewards = d.shopRewards || [];
+                exchangeHistory = d.exchangeHistory || [];
+                reminderTime = d.reminderTime || null;
+                if(d.dailyBonusClaimedForDate) dailyBonusClaimedForDate = new Map(d.dailyBonusClaimedForDate);
+            } catch(e) {}
+        }
+        if(shopRewards.length === 0) {
+            shopRewards = [
+                { name: "🎮 额外游戏时间30分钟", cost: 100 },
+                { name: "💰 5元零花钱", cost: 50 },
+                { name: "🍭 10元以内小零食", cost: 80 },
+                { name: "🕹️ 万达打游戏300游戏币", cost: 200 },
+                { name: "⌚ 华为儿童手表5pro或等值礼物", cost: 800 }
+            ];
+        }
+        const todayStr = getTodayStr();
+        if(!tasksByDate.has(todayStr) || tasksByDate.get(todayStr).length === 0) initDefaultTasksForDate(todayStr);
+        recalcTotalPointsAndUI();
+    }
+    function getTodayStr() { return new Date().toISOString().slice(0,10); }
+    function initDefaultTasksForDate(dateStr) {
+        const defaultTasks = [
+            { id: nextTaskId++, name: "🧮 口算小达人", points: 5, estimatedTime: 15, completed: false, type: "basic", zoneId: "warmup" },
+            { id: nextTaskId++, name: "✏️ 生字抄写", points: 5, estimatedTime: 15, completed: false, type: "basic", zoneId: "warmup" },
+            { id: nextTaskId++, name: "📖 语文作业", points: 5, estimatedTime: 20, completed: false, type: "basic", zoneId: "warmup" },
+            { id: nextTaskId++, name: "🧮 数学作业", points: 5, estimatedTime: 20, completed: false, type: "basic", zoneId: "warmup" },
+            { id: nextTaskId++, name: "🇬🇧 英语阅读", points: 5, estimatedTime: 15, completed: false, type: "basic", zoneId: "warmup" },
+            { id: nextTaskId++, name: "📚 课外阅读", points: 10, estimatedTime: 20, completed: false, type: "advanced", zoneId: "review" },
+            { id: nextTaskId++, name: "📖 语文阅读理解", points: 15, estimatedTime: 20, completed: false, type: "advanced", zoneId: "review" },
+            { id: nextTaskId++, name: "🚀 数学应用题挑战", points: 10, estimatedTime: 15, completed: false, type: "advanced", zoneId: "review" },
+            { id: nextTaskId++, name: "🧠 数学思维拓展", points: 15, estimatedTime: 15, completed: false, type: "advanced", zoneId: "review" }
+        ];
+        tasksByDate.set(dateStr, defaultTasks);
+        saveAll();
+    }
+    function recalcTotalPointsAndUI() {
+        let sum = 0;
+        for(let tasks of tasksByDate.values()) for(let t of tasks) if(t.completed) sum += t.points;
+        totalPoints = sum;
+        updateLevelUI();
+        updateMonthStats();
+    }
+    function updateLevelUI() {
+        const points = totalPoints;
+        const info = getLevelInfo(points);
+        document.getElementById("levelName").innerText = info.level;
+        document.getElementById("totalPointsText").innerText = points + "分";
+        let percent = info.nextRequired === 999999 ? 100 : ((points - info.currentMin) / (info.nextRequired - info.currentMin)) * 100;
+        percent = Math.min(100, Math.max(0, percent));
+        document.getElementById("levelProgressBar").style.width = `${percent}%`;
+        let left = info.nextRequired - points;
+        if(info.nextRequired === 999999) document.getElementById("nextLevelHint").innerHTML = "🎉 已达最高等级";
+        else document.getElementById("nextLevelHint").innerHTML = `再得${left}分升级${LEVELS.find(l=>l.min===info.nextRequired)?.name || ""} ✨`;
+        if(document.getElementById("shopPointsSpan")) document.getElementById("shopPointsSpan").innerText = points;
+    }
+    function updateMonthStats() {
+        const now = new Date();
+        const year = now.getFullYear(), month = now.getMonth();
+        let completedCount = 0, checkedDays = new Set(), monthPoints = 0;
+        for(let [dateStr, tasks] of tasksByDate.entries()) {
+            const d = new Date(dateStr);
+            if(d.getFullYear()===year && d.getMonth()===month) {
+                let hasComplete = false;
+                for(let t of tasks) {
+                    if(t.completed) { completedCount++; monthPoints += t.points; hasComplete = true; }
+                }
+                if(hasComplete) checkedDays.add(dateStr);
+            }
+        }
+        document.getElementById("monthTaskCount").innerText = completedCount;
+        document.getElementById("studyDaysCount").innerText = checkedDays.size;
+        document.getElementById("monthPointsSum").innerText = monthPoints;
+    }
+    function isDayChecked(dateStr) {
+        const tasks = tasksByDate.get(dateStr) || [];
+        return tasks.some(t => t.completed);
+    }
+    function renderCalendar(year, month) {
+        currentCalYear = year; currentCalMonth = month;
+        const firstDay = new Date(year, month, 1);
+        let startWeekday = firstDay.getDay() === 0 ? 6 : firstDay.getDay()-1;
+        const daysInMonth = new Date(year, month+1, 0).getDate();
+        const grid = document.getElementById("calendarGrid");
+        grid.innerHTML = "";
+        for(let i=0;i<startWeekday;i++) { let empty=document.createElement("div"); empty.className="cal-day opacity-30"; empty.innerText=""; grid.appendChild(empty); }
+        for(let day=1; day<=daysInMonth; day++) {
+            let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+            let checked = isDayChecked(dateStr);
+            let isSelected = (currentViewDate.getFullYear()===year && currentViewDate.getMonth()===month && currentViewDate.getDate()===day);
+            let dayDiv = document.createElement("div");
+            dayDiv.className = `cal-day ${checked ? 'checked' : ''} ${isSelected ? 'selected' : ''}`;
+            dayDiv.innerText = day;
+            dayDiv.addEventListener("click", (function(dd) { return function() { selectDate(new Date(year, month, dd)); }; })(day));
+            grid.appendChild(dayDiv);
+        }
+        document.getElementById("calendarMonthYear").innerHTML = `${year}年${month+1}月`;
+    }
+    function selectDate(date) {
+        currentViewDate = date;
+        document.getElementById("selectedDateDisplay").innerText = formatDate(date);
+        renderCurrentDateTasks();
+        renderCalendar(currentCalYear, currentCalMonth);
+    }
+    function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+    function getCurrentDateTasks() {
+        const key = formatDate(currentViewDate);
+        if(!tasksByDate.has(key)) tasksByDate.set(key, []);
+        return tasksByDate.get(key);
+    }
+    
+    function renderCurrentDateTasks() {
+        const tasks = getCurrentDateTasks();
+        const container = document.getElementById("timezoneTasksContainer");
+        const emptyHint = document.getElementById("globalEmptyHint");
+        if(tasks.length === 0) emptyHint.classList.remove("hidden");
+        else emptyHint.classList.add("hidden");
+        
+        container.innerHTML = "";
+        for(let zone of timeZones) {
+            const zoneTasks = tasks.filter(t => t.zoneId === zone.id);
+            const card = document.createElement("div");
+            card.className = "timezone-card p-3 bg-white rounded-2xl shadow-sm";
+            card.innerHTML = `
+                <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+                    <div class="flex items-center gap-2 font-bold text-amber-800">
+                        <i class="fas ${zone.icon}"></i>
+                        <span>${zone.title}</span>
+                        <span class="text-xs text-gray-500 font-normal time-range-text">${zone.defaultTime}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <input type="text" class="time-edit-input time-edit" value="${zone.defaultTime}" style="width:100px" placeholder="如 19:00-20:00">
+                        <button class="save-time-btn text-green-500 text-xs" data-zone-id="${zone.id}"><i class="fas fa-save"></i></button>
+                    </div>
+                </div>
+                <div class="space-y-2" id="zone-tasks-${zone.id}"></div>
+                <div class="mt-2 text-right">
+                    <button class="add-to-zone text-blue-400 text-xs bg-blue-50 px-2 py-1 rounded-full" data-zone-id="${zone.id}"><i class="fas fa-plus"></i> 添加任务到此时间段</button>
+                </div>
+            `;
+            const tasksDiv = card.querySelector(`#zone-tasks-${zone.id}`);
+            zoneTasks.forEach(task => tasksDiv.appendChild(createTaskElement(task)));
+            container.appendChild(card);
+        }
+        attachTaskEvents();
+        attachZoneEvents();
+        updateDailyGoalUI();
+    }
+    
+    function createTaskElement(task) {
+        const div = document.createElement("div");
+        div.className = "flex items-center justify-between bg-amber-50 p-2 rounded-xl";
+        div.innerHTML = `
+            <div class="flex items-center gap-2 flex-1">
+                <input type="checkbox" data-id="${task.id}" class="task-checkbox w-5 h-5 accent-amber-500" ${task.completed ? 'checked' : ''}>
+                <div class="flex-1">
+                    <div class="font-medium text-sm">${task.name} <span class="text-xs bg-white px-1 rounded ml-1">${task.type === 'basic' ? '📘基础' : '🚀拔高'}</span></div>
+                    <div class="flex gap-3 text-xs text-gray-500 mt-1">
+                        <span><i class="fas fa-star text-yellow-500"></i> ${task.points}分</span>
+                        <span><i class="fas fa-hourglass-half"></i> <input type="number" data-id="${task.id}" value="${task.estimatedTime || 0}" class="time-input w-12 border rounded px-1 text-xs" placeholder="分钟">分钟</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-1">
+                <button data-id="${task.id}" class="edit-task text-blue-400 w-7 h-7 rounded-full bg-white/50"><i class="fas fa-edit text-sm"></i></button>
+                <button data-id="${task.id}" class="delete-task text-red-400 w-7 h-7 rounded-full bg-white/50"><i class="fas fa-trash-alt text-sm"></i></button>
+            </div>
+        `;
+        return div;
+    }
+    
+    function attachZoneEvents() {
+        document.querySelectorAll(".save-time-btn").forEach(btn => {
+            btn.removeEventListener("click", handleSaveTime);
+            btn.addEventListener("click", handleSaveTime);
+        });
+        document.querySelectorAll(".add-to-zone").forEach(btn => {
+            btn.removeEventListener("click", handleAddToZone);
+            btn.addEventListener("click", handleAddToZone);
+        });
+    }
+    
+    function handleSaveTime(e) {
+        const zoneId = e.currentTarget.getAttribute("data-zone-id");
+        const card = e.currentTarget.closest(".timezone-card");
+        const timeInput = card.querySelector(".time-edit");
+        const zone = timeZones.find(z => z.id === zoneId);
+        if(zone && timeInput) {
+            zone.defaultTime = timeInput.value;
+            const timeSpan = card.querySelector(".time-range-text");
+            if(timeSpan) timeSpan.innerText = zone.defaultTime;
+            saveTimeSettings();
+            showToast(`⏰ ${zone.title}时间已更新`, false);
+        }
+    }
+    
+    function handleAddToZone(e) {
+        const zoneId = e.currentTarget.getAttribute("data-zone-id");
+        const taskName = prompt("请输入任务名称", "新任务");
+        if(!taskName) return;
+        const points = parseInt(prompt("积分值", 5)) || 5;
+        const type = confirm("是否为拔高任务？点击确定是拔高，取消是基础") ? "advanced" : "basic";
+        addTaskToZone(zoneId, taskName, points, 10, type);
+    }
+    
+    function addTaskToZone(zoneId, name, points, estimatedTime=10, type="basic") {
+        if(!name.trim()) return;
+        const tasks = getCurrentDateTasks();
+        tasks.push({ id: nextTaskId++, name: name.trim(), points: parseInt(points), estimatedTime: parseInt(estimatedTime), completed: false, type: type, zoneId: zoneId });
+        saveAll();
+        renderCurrentDateTasks();
+        renderCalendar(currentCalYear, currentCalMonth);
+        showToast(`✨ 添加任务「${name}」`, false);
+    }
+    
+    function attachTaskEvents() {
+        document.querySelectorAll(".task-checkbox").forEach(cb => cb.addEventListener("change", handleTaskComplete));
+        document.querySelectorAll(".delete-task").forEach(btn => btn.addEventListener("click", handleDeleteTask));
+        document.querySelectorAll(".edit-task").forEach(btn => btn.addEventListener("click", handleEditTask));
+        document.querySelectorAll(".time-input").forEach(inp => inp.addEventListener("change", handleTimeChange));
+    }
+    
+    function showToast(msg, isReward=true) {
+        let toast = document.createElement("div");
+        toast.className = `fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-${isReward ? 'green' : 'gray'}-500 text-white px-5 py-2 rounded-full shadow-lg z-50 text-sm flex items-center gap-2 toast-encourage`;
+        toast.innerHTML = `<i class="fas fa-${isReward ? 'star' : 'eraser'}"></i> ${msg}`;
+        document.body.appendChild(toast);
+        setTimeout(()=>toast.remove(), 2000);
+    }
+    
+    function handleTaskComplete(e) {
+        const taskId = parseInt(e.target.getAttribute("data-id"));
+        const tasks = getCurrentDateTasks();
+        const task = tasks.find(t => t.id === taskId);
+        if(task && task.completed !== e.target.checked) {
+            task.completed = e.target.checked;
+            if(task.completed) {
+                totalPoints += task.points;
+                showToast(`🎉 完成「${task.name}」 +${task.points}积分！`, true);
+                const oldLevel = getLevelInfo(totalPoints - task.points).level;
+                const newLevel = getLevelInfo(totalPoints).level;
+                if(oldLevel !== newLevel) showToast(`✨ 恭喜升级为 ${newLevel} ✨`, true);
+            } else {
+                totalPoints -= task.points;
+                showToast(`⏪ 取消完成，扣除${task.points}积分`, false);
+            }
+            saveAll();
+            updateLevelUI();
+            updateMonthStats();
+            renderCurrentDateTasks();
+            renderCalendar(currentCalYear, currentCalMonth);
+            checkAndGrantDailyBonus();
+        }
+    }
+    
+    function handleDeleteTask(e) {
+        const taskId = parseInt(e.target.closest("button").getAttribute("data-id"));
+        let tasks = getCurrentDateTasks();
+        const idx = tasks.findIndex(t => t.id === taskId);
+        if(idx !== -1) {
+            if(tasks[idx].completed) totalPoints -= tasks[idx].points;
+            tasks.splice(idx,1);
+            saveAll();
+            recalcTotalPointsAndUI();
+            renderCurrentDateTasks();
+            renderCalendar(currentCalYear, currentCalMonth);
+            showToast("🗑️ 任务已删除", false);
+        }
+    }
+    
+    function handleEditTask(e) {
+        const taskId = parseInt(e.target.closest("button").getAttribute("data-id"));
+        let tasks = getCurrentDateTasks();
+        const task = tasks.find(t => t.id === taskId);
+        if(task) {
+            let newName = prompt("编辑任务名称", task.name);
+            if(newName) task.name = newName;
+            let newPoints = parseInt(prompt("修改积分值", task.points));
+            if(!isNaN(newPoints) && newPoints!==task.points) {
+                if(task.completed) totalPoints = totalPoints - task.points + newPoints;
+                task.points = newPoints;
+                updateLevelUI();
+            }
+            saveAll();
+            renderCurrentDateTasks();
+        }
+    }
+    
+    function handleTimeChange(e) {
+        const taskId = parseInt(e.target.getAttribute("data-id"));
+        let tasks = getCurrentDateTasks();
+        const task = tasks.find(t => t.id === taskId);
+        if(task) { task.estimatedTime = parseInt(e.target.value) || 0; saveAll(); }
+    }
+    
+    function updateDailyGoalUI() {
+        const tasks = getCurrentDateTasks();
+        const basicTasks = tasks.filter(t => t.type === "basic");
+        const completed = basicTasks.filter(t => t.completed).length;
+        const total = basicTasks.length;
+        document.getElementById("dailyGoalProgress").innerText = `进度: ${completed}/${total}`;
+        const allDone = total > 0 && completed === total;
+        const dateKey = formatDate(currentViewDate);
+        if(allDone && !dailyBonusClaimedForDate.get(dateKey)) document.getElementById("dailyGoalBadge").innerHTML = "🎁 可领取!";
+        else if(allDone && dailyBonusClaimedForDate.get(dateKey)) document.getElementById("dailyGoalBadge").innerHTML = "✅ 已领取";
+        else document.getElementById("dailyGoalBadge").innerHTML = "未完成";
+    }
+    
+    function checkAndGrantDailyBonus() {
+        const tasks = getCurrentDateTasks();
+        const basicTasks = tasks.filter(t => t.type === "basic");
+        const allBasicDone = basicTasks.length > 0 && basicTasks.every(t => t.completed);
+        const dateKey = formatDate(currentViewDate);
+        if(allBasicDone && !dailyBonusClaimedForDate.get(dateKey)) {
+            dailyBonusClaimedForDate.set(dateKey, true);
+            totalPoints += 10;
+            saveAll();
+            updateLevelUI();
+            showToast("🎯 每日小目标达成！额外+10积分！", true);
+            updateDailyGoalUI();
+            const badge = document.getElementById("dailyGoalBadge");
+            badge.style.transform = "scale(1.1)";
+            setTimeout(()=> badge.style.transform = "", 300);
+        }
+    }
+    
+    // 快捷预设任务绑定 - 根据选中的时段添加
+    document.querySelectorAll(".quick-preset").forEach(btn => {
+        btn.addEventListener("click", () => {
+            // 获取选中的时段radio值
+            const selectedZone = document.querySelector('input[name="presetZone"]:checked').value;
+            const name = btn.getAttribute("data-name");
+            const points = btn.getAttribute("data-points");
+            const type = btn.getAttribute("data-type") || "basic";
+            addTaskToZone(selectedZone, name, points, 10, type);
+        });
+    });
+    document.getElementById("addCustomTaskBtn").addEventListener("click", () => {
+        let name = document.getElementById("customTaskName").value;
+        let pts = document.getElementById("customTaskPoints").value;
+        let type = document.getElementById("customTaskType").value;
+        let zoneId = document.getElementById("customTaskZoneSelect").value;
+        if(name) addTaskToZone(zoneId, name, pts, 10, type);
+        document.getElementById("customTaskName").value = "";
+    });
+    document.getElementById("reviewTodayBtn").addEventListener("click", () => {
+        let review = prompt("📝 今日复盘 (3-2-1)\n1️⃣ 三个收获？\n2️⃣ 两点进步？\n3️⃣ 一个可以改进的地方？", "今天我学会了...");
+        if(review) showToast("复盘记录已保存！你真棒", true);
+    });
+    
+    // 积分商城
+    function refreshShopUI() {
+        document.getElementById("shopPointsSpan").innerText = totalPoints;
+        const rewardDiv = document.getElementById("rewardList");
+        rewardDiv.innerHTML = "";
+        shopRewards.forEach((r, idx) => {
+            let div = document.createElement("div");
+            div.className = "flex justify-between items-center bg-amber-50 p-2 rounded-xl";
+            div.innerHTML = `<div><span>🎁 ${r.name}</span><span class="text-xs ml-2">${r.cost}分</span></div><button data-idx="${idx}" class="exchange-reward bg-blue-300 px-3 py-1 rounded-full text-xs">兑换</button>`;
+            rewardDiv.appendChild(div);
+        });
+        document.querySelectorAll(".exchange-reward").forEach(btn => btn.addEventListener("click", (e) => {
+            let idx = btn.getAttribute("data-idx");
+            let reward = shopRewards[idx];
+            if(totalPoints >= reward.cost) {
+                totalPoints -= reward.cost;
+                exchangeHistory.unshift({ rewardName: reward.name, cost: reward.cost, date: new Date().toLocaleDateString() });
+                saveAll();
+                updateLevelUI();
+                refreshShopUI();
+                showToast(`兑换成功！消耗${reward.cost}积分获得${reward.name}`, true);
+            } else alert("积分不足～");
+        }));
+        let historyDiv = document.getElementById("exchangeHistoryList");
+        historyDiv.innerHTML = exchangeHistory.slice(0,10).map(h => `<div>• ${h.date} 兑换 ${h.rewardName} (-${h.cost})</div>`).join("");
+    }
+    document.getElementById("openShopBtn").addEventListener("click",()=>{ document.getElementById("shopModal").classList.remove("hidden"); refreshShopUI(); });
+    document.getElementById("closeShopBtn").addEventListener("click",()=>document.getElementById("shopModal").classList.add("hidden"));
+    document.getElementById("addRewardBtn").addEventListener("click",()=>{ let name=document.getElementById("newRewardName").value, cost=parseInt(document.getElementById("newRewardCost").value); if(name&&cost){ shopRewards.push({name,cost}); saveAll(); refreshShopUI(); } });
+    
+    // 提醒功能
+    function setDailyReminder(time) {
+        let [hour, minute] = time.split(":");
+        setInterval(() => {
+            let now = new Date();
+            if(now.getHours() == parseInt(hour) && now.getMinutes() == parseInt(minute) && Notification.permission === "granted") {
+                new Notification("乐乐打卡机", { body: "到时间开始今天学习任务了！", icon: "https://cdn-icons-png.flaticon.com/512/1995/1995572.png" });
+                let msg = new SpeechSynthesisUtterance("到时间开始今天学习任务了");
+                msg.rate = 0.9; msg.pitch = 1.3;
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(msg);
+            }
+        }, 60000);
+    }
+    document.getElementById("reminderBtn").addEventListener("click",()=>{ document.getElementById("reminderModal").classList.remove("hidden"); if(reminderTime) document.getElementById("reminderTimeInput").value=reminderTime; if(Notification.permission!=="granted") Notification.requestPermission(); });
+    document.getElementById("saveReminderBtn").addEventListener("click",()=>{ let time=document.getElementById("reminderTimeInput").value; if(time){ reminderTime=time; saveAll(); setDailyReminder(time); document.getElementById("reminderStatus").innerText=`提醒已设置 ${time}`; } });
+    document.getElementById("closeReminderBtn").addEventListener("click",()=>document.getElementById("reminderModal").classList.add("hidden"));
+    
+    // 统计图表
+    function showStats(period="week") {
+        let dates=[], rates=[], totalMins=0;
+        let now=new Date();
+        if(period==="week") {
+            for(let i=6;i>=0;i--) {
+                let d=new Date(now); d.setDate(now.getDate()-i);
+                let ds=formatDate(d);
+                let tasks=tasksByDate.get(ds)||[];
+                let total=tasks.length, completed=tasks.filter(t=>t.completed).length;
+                let rate=total===0?0:(completed/total)*100;
+                rates.push(rate);
+                dates.push(`${d.getMonth()+1}/${d.getDate()}`);
+                for(let t of tasks) if(t.completed && t.estimatedTime) totalMins+=t.estimatedTime;
+            }
+        } else {
+            let year=now.getFullYear(), month=now.getMonth();
+            let daysInMonth=new Date(year,month+1,0).getDate();
+            for(let day=1;day<=daysInMonth;day++){
+                let ds=`${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                let tasks=tasksByDate.get(ds)||[];
+                let total=tasks.length, completed=tasks.filter(t=>t.completed).length;
+                let rate=total===0?0:(completed/total)*100;
+                rates.push(rate);
+                for(let t of tasks) if(t.completed && t.estimatedTime) totalMins+=t.estimatedTime;
+            }
+        }
+        let avgRate = rates.length? rates.reduce((a,b)=>a+b,0)/rates.length : 0;
+        document.getElementById("completionRateSpan").innerText=Math.round(avgRate)+"%";
+        document.getElementById("completionBar").style.width=avgRate+"%";
+        document.getElementById("totalStudyMinutesSpan").innerText=totalMins;
+        drawChart(rates.slice(0,7), dates.slice(0,7));
+    }
+    function drawChart(rates, labels) {
+        const canvas=document.getElementById("trendChart");
+        if(!canvas) return;
+        const ctx=canvas.getContext("2d");
+        canvas.width=280; canvas.height=120;
+        ctx.clearRect(0,0,280,120);
+        if(!rates.length) return;
+        let barW=(280-30)/Math.min(rates.length,7)-4;
+        for(let i=0;i<Math.min(rates.length,7);i++){
+            let h=(rates[i]/100)*80;
+            let x=10+i*(barW+6);
+            let y=110-h;
+            ctx.fillStyle="#fbbf24";
+            ctx.fillRect(x,y,barW,h);
+            ctx.fillStyle="#333";
+            ctx.font="8px sans-serif";
+            ctx.fillText(labels[i]||"",x+2,118);
+        }
+    }
+    document.getElementById("statsBtn").addEventListener("click",()=>{ document.getElementById("statsModal").classList.remove("hidden"); showStats("week"); });
+    document.getElementById("weekStatTab").addEventListener("click",()=>showStats("week"));
+    document.getElementById("monthStatTab").addEventListener("click",()=>showStats("month"));
+    document.getElementById("closeStatsBtn").addEventListener("click",()=>document.getElementById("statsModal").classList.add("hidden"));
+    document.getElementById("prevMonthBtn").addEventListener("click",()=>{ let newM=new Date(currentCalYear, currentCalMonth-1,1); renderCalendar(newM.getFullYear(), newM.getMonth()); });
+    document.getElementById("nextMonthBtn").addEventListener("click",()=>{ let newM=new Date(currentCalYear, currentCalMonth+1,1); renderCalendar(newM.getFullYear(), newM.getMonth()); });
+    
+    // 初始化
+    loadAll();
+    const today = new Date();
+    currentViewDate = today;
+    renderCalendar(today.getFullYear(), today.getMonth());
+    selectDate(today);
+    if(reminderTime) setDailyReminder(reminderTime);
+    checkAndGrantDailyBonus();
+    
+    // ========= PWA 注册 Service Worker =========
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('✅ Service Worker 注册成功', reg))
+            .catch(err => console.log('❌ Service Worker 注册失败', err));
+    }
+</script>
+</body>
+</html>
